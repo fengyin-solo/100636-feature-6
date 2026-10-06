@@ -33,6 +33,10 @@
       <button class="btn ghost" type="button" @click="resetFilters">重置条件</button>
     </form>
 
+    <div v-if="stoppedCount" class="warn-banner">
+      <p>⚠️ 下列有 {{ stoppedCount }} 条入廊管线随所属管廊停用，台账已读取「随廊停用」标记，请核对停运范围。</p>
+    </div>
+
     <table class="data-table">
       <thead>
         <tr>
@@ -42,8 +46,12 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+        <tr v-for="row in rows" :key="String(row.id)" :class="{ 'row-stopped': row['随廊停用'] }">
+          <td v-for="column in columns" :key="column">
+            <span v-if="column === '随廊停用' && row[column]"><span class="stopped-tag">{{ row[column] }}</span></span>
+            <span v-else-if="column === '随廊停用'" class="muted-cell">—</span>
+            <template v-else>{{ row[column] === '' ? '—' : (row[column] ?? '—') }}</template>
+          </td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -82,16 +90,22 @@ import {
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('pipeline')
-const columns = ["管线编号", "所属舱室", "管线类型", "权属单位", "入廊日期", "设计容量", "对接联系人", "管线状态"]
+const columns = ["管线编号", "所属舱室", "管线类型", "权属单位", "入廊日期", "设计容量", "对接联系人", "随廊停用", "管线状态"]
 const actions = ["登记入廊", "确认运行", "办理迁出"]
 const statuses = ["待登记", "已入廊", "运行中", "已迁出"]
-const stats = [{"label": "已入廊管线", "value": 0}, {"label": "运行中管线", "value": 0}, {"label": "待登记管线", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stoppedCount = computed(() => rows.value.filter((row) => row['随廊停用']).length)
+const stats = computed(() => [
+  { label: "运行中管线", value: rows.value.filter((row) => String(row.status) === '运行中').length },
+  { label: "已入廊管线", value: rows.value.filter((row) => ['已入廊', '运行中'].includes(String(row.status))).length },
+  { label: "随廊停用管线", value: stoppedCount.value },
+  { label: "待登记管线", value: rows.value.filter((row) => String(row.status) === '待登记').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,

@@ -33,6 +33,10 @@
       <button class="btn ghost" type="button" @click="resetFilters">重置条件</button>
     </form>
 
+    <div v-if="stoppedCount" class="warn-banner">
+      <p>⚠️ 下列有 {{ stoppedCount }} 台在册设备随所属管廊停用，设备台账已读取「随廊停用」标记，请按停用管廊设备处置。</p>
+    </div>
+
     <table class="data-table">
       <thead>
         <tr>
@@ -42,8 +46,12 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+        <tr v-for="row in rows" :key="String(row.id)" :class="{ 'row-stopped': row['随廊停用'] }">
+          <td v-for="column in columns" :key="column">
+            <span v-if="column === '随廊停用' && row[column]"><span class="stopped-tag">{{ row[column] }}</span></span>
+            <span v-else-if="column === '随廊停用'" class="muted-cell">—</span>
+            <template v-else>{{ row[column] === '' ? '—' : (row[column] ?? '—') }}</template>
+          </td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -82,16 +90,22 @@ import {
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('device')
-const columns = ["设备编号", "设备名称", "设备型号", "所属舱室", "投运日期", "保养周期", "上次保养日", "设备状态"]
+const columns = ["设备编号", "设备名称", "设备型号", "所属舱室", "投运日期", "保养周期", "上次保养日", "随廊停用", "设备状态"]
 const actions = ["登记运行", "完成保养", "报废设备"]
 const statuses = ["待保养", "运行中", "已保养", "已报废"]
-const stats = [{"label": "运行中设备", "value": 0}, {"label": "待保养设备", "value": 0}, {"label": "已报废设备", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stoppedCount = computed(() => rows.value.filter((row) => row['随廊停用']).length)
+const stats = computed(() => [
+  { label: "运行中设备", value: rows.value.filter((row) => String(row.status) === '运行中').length },
+  { label: "待保养设备", value: rows.value.filter((row) => String(row.status) === '待保养').length },
+  { label: "随廊停用设备", value: stoppedCount.value },
+  { label: "已报废设备", value: rows.value.filter((row) => String(row.status) === '已报废').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,

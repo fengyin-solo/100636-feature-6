@@ -24,6 +24,8 @@
       </span>
     </p>
 
+    <p class="reading-note">老处置记录按「发现日期」倒排补录；缺值（如未派班组、未完工）一律留空显示「—」，不以默认值顶替。</p>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -43,7 +45,7 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">{{ row[column] === '' || row[column] === undefined ? '—' : row[column] }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -85,13 +87,20 @@ const meta = moduleMeta('leak')
 const columns = ["处置编号", "渗漏点位", "渗漏程度", "处置方式", "处置班组", "发现日期", "完工日期", "处置状态"]
 const actions = ["派出处置", "确认完工", "要求返工"]
 const statuses = ["待处置", "处置中", "已完工", "需返工"]
-const stats = [{"label": "待处置渗漏点", "value": 0}, {"label": "处置中渗漏点", "value": 0}, {"label": "本月完工数", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stats = computed(() => {
+  const monthPrefix = new Date().toISOString().slice(0, 7)
+  return [
+    { label: "待处置渗漏点", value: rows.value.filter((row) => String(row.status) === '待处置').length },
+    { label: "处置中渗漏点", value: rows.value.filter((row) => String(row.status) === '处置中').length },
+    { label: "本月完工数", value: rows.value.filter((row) => String(row.status) === '已完工' && String(row['完工日期']).startsWith(monthPrefix)).length },
+  ]
+})
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,

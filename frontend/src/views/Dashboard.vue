@@ -3,7 +3,7 @@
     <header class="page-head">
       <div>
         <h2>运营概览</h2>
-        <p class="page-desc">汇总各业务模块的关键指标，先看总量再看异常。</p>
+        <p class="page-desc">汇总各业务模块的关键指标，先看总量再看异常；管廊片区对照与管廊台账、值班台账同版呈现。</p>
       </div>
       <div class="page-actions">
         <button class="btn" type="button" @click="refresh">重新统计</button>
@@ -15,6 +15,9 @@
         <strong class="stat-value">{{ card.value }}</strong>
       </article>
     </div>
+
+    <ZoneSummary title="管廊片区对照（与管廊台账、值班台账同一版）" :refresh-key="refreshKey" />
+
     <table class="data-table">
       <thead>
         <tr><th>业务模块</th><th>今日新增</th><th>待处理</th><th>异常量</th></tr>
@@ -29,7 +32,7 @@
       </tbody>
     </table>
     <footer class="page-foot">
-      <span>数据保存在本机浏览器里，换浏览器或清缓存会回到示例数据</span>
+      <span>数据保存在本机浏览器里，换浏览器或清缓存会回到示例数据 · 汇总、对照、报表读数一致</span>
     </footer>
   </section>
 </template>
@@ -39,14 +42,17 @@ import { onMounted, ref } from 'vue'
 
 import { loadOverview } from '@/api/local-service'
 import type { OverviewResult } from '@/data/types'
+import ZoneSummary from '@/components/ZoneSummary.vue'
 
 const cards = ref<OverviewResult['cards']>([])
 const moduleRows = ref<OverviewResult['modules']>([])
+const refreshKey = ref(0)
 
 function refresh() {
   const payload = loadOverview()
   cards.value = payload.cards
   moduleRows.value = payload.modules
+  refreshKey.value += 1
 }
 
 onMounted(refresh)

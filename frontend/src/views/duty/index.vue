@@ -18,6 +18,9 @@
       </article>
     </div>
 
+    <!-- 关键数值：直接取片区对照的同源读数，和管廊台账、运营概览两处条数一致 -->
+    <ZoneSummary title="管廊关键数值（值班读数，与管廊台账一致）" :refresh-key="refreshKey" />
+
     <p class="status-legend">
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
         {{ item.status }}：{{ item.count }}
@@ -76,22 +79,41 @@ import { computed, onMounted, ref } from 'vue'
 import {
   downloadEntries,
   listEntries,
+  listRows,
   moduleMeta,
   runAction as applyAction,
+  zoneTotals,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
+import ZoneSummary from '@/components/ZoneSummary.vue'
 
 const meta = moduleMeta('duty')
 const columns = ["交接编号", "值班班组", "值班日期", "班次", "值班人员", "交接事项", "交接人员", "交接状态"]
 const actions = ["发起交接", "确认交接", "登记遗留"]
 const statuses = ["待交接", "交接中", "已交接", "有遗留"]
-const stats = [{"label": "待交接班次", "value": 0}, {"label": "已交接班次", "value": 0}, {"label": "有遗留事项", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const refreshKey = ref(0)
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+// 值班台账上的关键数值取自管廊对照同源聚合，运行/检修/停用条数与另一入口完全一致。
+const stats = computed(() => {
+  void refreshKey.value
+  const zone = zoneTotals()
+  const dutyRows = listRows('duty')
+  return [
+    { label: '运行中管廊', value: zone.running },
+    { label: '检修中管廊', value: zone.repairing },
+    { label: '已停用管廊', value: zone.stopped },
+    { label: '在册管廊合计', value: zone.count },
+    { label: '待交接班次', value: dutyRows.filter((row) => String(row.status) === '待交接').length },
+    { label: '有遗留事项', value: dutyRows.filter((row) => String(row.status) === '有遗留').length },
+  ]
+})
+
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -117,8 +139,10 @@ function runAction(action: string, row: EntryRow) {
   const result = applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
+    refreshKey.value += 1
     return
   }
+  refreshKey.value += 1
   reload()
 }
 
