@@ -30,6 +30,8 @@ export type PageResult = {
 export type ActionResult = {
   ok: boolean
   message: string
+  /** true 表示本次没有产生新落账，只是并入了同一条记录的既有轨迹。 */
+  merged?: boolean
 }
 
 export type OverviewResult = {

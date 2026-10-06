@@ -51,6 +51,8 @@
               :key="action"
               class="link"
               type="button"
+              :disabled="!canOperate(row)"
+              :title="canOperate(row) ? '' : notYourUnit(row)"
               @click="runAction(action, row)"
             >
               {{ action }}
@@ -80,6 +82,7 @@ import {
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
+import { useSessionStore } from '@/stores/session'
 
 const meta = moduleMeta('entryapprove')
 const columns = ["申请编号", "申请单位", "作业舱室", "作业类型", "作业人数", "安全措施", "审批人员", "审批状态"]
@@ -87,9 +90,11 @@ const actions = ["提交审批", "确认批准", "驳回申请"]
 const statuses = ["待审批", "已批准", "已驳回", "已完工"]
 const stats = [{"label": "待审批申请", "value": 0}, {"label": "已批准申请", "value": 0}, {"label": "已驳回申请", "value": 0}]
 
+const session = useSessionStore()
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const infoMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -98,6 +103,16 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+function canOperate(row: EntryRow): boolean {
+  const applicant = String(row['申请单位'] ?? '')
+  // 样例占位单位（名称含“样例”）不在权属字典里，默认放行；真实单位则必须归属一致。
+  return applicant.includes('样例') || applicant === session.unit
+}
+
+function notYourUnit(row: EntryRow): string {
+  return `申请由「${row['申请单位']}」发起，当前单位「${session.unit}」跨单位代提交将被挡回`
+}
 
 function resetFilters() {
   filters.value = {}
@@ -114,10 +129,15 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  infoMessage.value = ''
+  const result = applyAction(meta.key, Number(row.id), action, {
+    unit: session.unit,
+    operator: session.operator,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
-    return
+  } else {
+    infoMessage.value = result.message
   }
   reload()
 }

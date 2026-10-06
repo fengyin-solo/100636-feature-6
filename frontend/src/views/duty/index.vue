@@ -3,13 +3,43 @@
     <header class="page-head">
       <div>
         <h2>运维值班交接管理</h2>
-        <p class="page-desc">维护值班交接记录，围绕交接编号、值班班组、值班日期、班次做登记、筛选与状态流转。</p>
+        <p class="page-desc">值班台账同步呈现管廊主体台账的关键数值，两处条数一致、同源读数。</p>
       </div>
       <div class="page-actions">
-        <button class="btn primary" type="button" @click="openCreate">登记值班交接记录</button>
         <button class="btn" type="button" @click="exportRows">导出运维值班交接清单</button>
       </div>
     </header>
+
+    <div class="kpi-strip">
+      <RouterLink class="kpi-item" to="/tunnel">
+        <span class="stat-label">管廊条数（片区）</span>
+        <strong>{{ tunnelData.kpis.tunnelCount }} <em>/ {{ tunnelData.kpis.zoneCount }}</em></strong>
+      </RouterLink>
+      <RouterLink class="kpi-item" to="/tunnel">
+        <span class="stat-label">舱室合计</span>
+        <strong>{{ tunnelData.kpis.cabinTotal }}</strong>
+      </RouterLink>
+      <RouterLink class="kpi-item status-running" to="/tunnel?status=运行中">
+        <span class="stat-label">运行中</span>
+        <strong>{{ tunnelData.kpis.running }}</strong>
+      </RouterLink>
+      <RouterLink class="kpi-item status-maintaining" to="/tunnel?status=检修中">
+        <span class="stat-label">检修中</span>
+        <strong>{{ tunnelData.kpis.maintaining }}</strong>
+      </RouterLink>
+      <RouterLink class="kpi-item" to="/tunnel?status=待投运">
+        <span class="stat-label">待投运</span>
+        <strong>{{ tunnelData.kpis.pending }}</strong>
+      </RouterLink>
+      <RouterLink class="kpi-item status-stopped" to="/tunnel?status=已停用">
+        <span class="stat-label">已停用</span>
+        <strong>{{ tunnelData.kpis.stopped }}</strong>
+      </RouterLink>
+      <RouterLink class="kpi-item" to="/device">
+        <span class="stat-label">随廊停用挂账</span>
+        <strong>管线{{ tunnelData.kpis.stoppedPipelines }} · 设备{{ tunnelData.kpis.stoppedDevices }}</strong>
+      </RouterLink>
+    </div>
 
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
@@ -38,33 +68,21 @@
         <tr>
           <th v-for="column in columns" :key="column">{{ column }}</th>
           <th>当前状态</th>
-          <th>可执行动作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
-          <td class="row-actions">
-            <button
-              v-for="action in actions"
-              :key="action"
-              class="link"
-              type="button"
-              @click="runAction(action, row)"
-            >
-              {{ action }}
-            </button>
-          </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无运维值班交接数据，可先登记值班交接记录</td>
+          <td :colspan="columns.length + 1" class="empty-state">暂无运维值班交接数据</td>
         </tr>
       </tbody>
     </table>
 
     <footer class="page-foot">
-      <span>共 {{ total }} 条运维值班交接记录</span>
+      <span>共 {{ total }} 条值班交接记录；上方管廊读数来自管廊主体台账同一汇总口径</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -73,25 +91,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import {
-  downloadEntries,
-  listEntries,
-  moduleMeta,
-  runAction as applyAction,
-} from '@/api/local-service'
+import { downloadEntries, listEntries, moduleMeta, tunnelOverview } from '@/api/local-service'
+import type { TunnelOverview } from '@/domain/tunnel-domain'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('duty')
 const columns = ["交接编号", "值班班组", "值班日期", "班次", "值班人员", "交接事项", "交接人员", "交接状态"]
-const actions = ["发起交接", "确认交接", "登记遗留"]
 const statuses = ["待交接", "交接中", "已交接", "有遗留"]
-const stats = [{"label": "待交接班次", "value": 0}, {"label": "已交接班次", "value": 0}, {"label": "有遗留事项", "value": 0}]
+const stats = computed(() => [
+  { label: "待交接班次", value: rows.value.filter((r) => r.status === '待交接').length },
+  { label: "已交接班次", value: rows.value.filter((r) => r.status === '已交接').length },
+  { label: "有遗留事项", value: rows.value.filter((r) => r.status === '有遗留').length },
+])
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const tunnelData = ref<TunnelOverview>(tunnelOverview())
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -108,26 +126,13 @@ function exportRows() {
   downloadEntries(meta.key)
 }
 
-function openCreate() {
-  errorMessage.value = '值班交接记录登记入口尚未接入审批流'
-}
-
-function runAction(action: string, row: EntryRow) {
-  errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
-  if (!result.ok) {
-    errorMessage.value = result.message
-    return
-  }
-  reload()
-}
-
 function reload() {
   errorMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    tunnelData.value = tunnelOverview()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '运维值班交接列表读取失败'
   }

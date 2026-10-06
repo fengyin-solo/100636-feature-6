@@ -35,3 +35,64 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .error-text { color: #b42318; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .legend-item { background: #eef2f7; border-radius: 999px; padding: 2px 10px; }
+
+/* 片区对照 */
+.zone-board { margin: 8px 0 16px; }
+.board-head h3 { margin: 4px 0; font-size: 15px; }
+.board-tip { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+.zone-table td.num, .zone-table th:nth-child(n+2) { text-align: center; }
+.zone-table tr.clickable { cursor: pointer; }
+.zone-table tr.clickable:hover td { background: #f0f6ff; }
+.zone-total td { background: #f8fafc; font-weight: 600; }
+.strong { font-weight: 700; }
+.status-running { color: #067647; }
+.status-maintaining { color: #b54708; }
+.status-pending { color: #175cd3; }
+.status-stopped, .status-stopped strong { color: #b42318; }
+.badge { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; background: #eef2f7; color: #475467; }
+.badge.warn { background: #fef3f2; color: #b42318; border: 1px solid #fecdca; }
+.badge.inferred { background: #fffaeb; color: #b54708; border: 1px solid #fedf89; }
+.muted { color: var(--muted); font-size: 12px; }
+.missing { color: #b42318; font-size: 12px; }
+.info-text { color: #067647; }
+.alt-date { font-size: 12px; }
+
+/* 视图切换 */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-right: 8px; }
+.seg button { border: none; background: #fff; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+.seg button.active { background: var(--brand); color: #fff; }
+.drill-banner { background: #eff8ff; border: 1px solid #b2ddff; border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; }
+.drill-banner .link { margin-left: 8px; }
+.block-title { font-size: 15px; margin: 18px 0 8px; }
+
+/* 状态标签与挂账行 */
+.status-tag { border-radius: 999px; padding: 1px 10px; font-size: 12px; background: #eef2f7; }
+.status-tag.status-running { background: #ecfdf3; }
+.status-tag.status-maintaining { background: #fffaeb; }
+.status-tag.status-pending { background: #eff8ff; }
+.status-tag.status-stopped { background: #fef3f2; }
+tr.row-flagged { background: #fffbf9; }
+.stat-warn .stat-value { color: #b42318; }
+.sort-mark { font-size: 11px; color: var(--brand); margin-left: 4px; }
+.sort-bar { display: flex; gap: 14px; align-items: center; font-size: 13px; margin-bottom: 10px; flex-wrap: wrap; }
+.sort-bar label { display: inline-flex; gap: 4px; align-items: center; }
+
+/* 值班台账 KPI 条 */
+.kpi-strip { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.kpi-item { flex: 1; min-width: 130px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; text-decoration: none; color: inherit; }
+.kpi-item:hover { border-color: var(--brand); }
+.kpi-item strong { font-size: 19px; display: block; margin-top: 2px; }
+.kpi-item em { font-style: normal; font-size: 12px; color: var(--muted); }
+
+/* 轨迹面板 */
+.trail-panel { margin-top: 18px; }
+.trail-panel h3 { font-size: 15px; margin-bottom: 4px; }
+.trail-panel .data-table td { font-size: 12px; }
+
+/* 顶栏单位切换 */
+.app-head { gap: 12px; flex-wrap: wrap; }
+.unit-switch { white-space: nowrap; }
+.unit-switch select { font-size: 12px; padding: 2px 4px; }
+.filter-item.checkbox { display: flex; align-items: center; gap: 4px; padding-bottom: 6px; }
+.filter-item.checkbox span { display: inline; }
+button.link:disabled { color: #98a2b3; cursor: not-allowed; text-decoration: line-through; }

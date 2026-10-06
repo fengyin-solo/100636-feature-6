@@ -2,11 +2,10 @@
   <section class="page" data-module="leak">
     <header class="page-head">
       <div>
-        <h2>渗漏水处置管理</h2>
-        <p class="page-desc">维护渗漏处置单，围绕处置编号、渗漏点位、渗漏程度、处置方式做登记、筛选与状态流转。</p>
+        <h2>渗漏水处置</h2>
+        <p class="page-desc">老的处置记录按发现日期倒排补录，发现日期缺值一律沉底并标注「缺值·待补录」，不拿默认值顶上。</p>
       </div>
       <div class="page-actions">
-        <button class="btn primary" type="button" @click="openCreate">登记渗漏处置单</button>
         <button class="btn" type="button" @click="exportRows">导出渗漏水处置清单</button>
       </div>
     </header>
@@ -18,11 +17,12 @@
       </article>
     </div>
 
-    <p class="status-legend">
-      <span v-for="item in statusSummary" :key="item.status" class="legend-item">
-        {{ item.status }}：{{ item.count }}
-      </span>
-    </p>
+    <div class="sort-bar">
+      <span>排序口径：</span>
+      <label><input v-model="sortMode" type="radio" value="found" /> 发现日期倒排（主口径）</label>
+      <label><input v-model="sortMode" type="radio" value="finished" /> 完工日期倒排（仅作对照）</label>
+      <span class="muted">两种口径下缺值都沉底，顺序差异即对照结果</span>
+    </div>
 
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
@@ -36,35 +36,37 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th v-for="column in columns" :key="column">{{ column }}</th>
+          <th v-for="column in columns" :key="column">
+            {{ column }}
+            <span v-if="column === '发现日期'" class="sort-mark">↓{{ sortMode === 'found' ? '主口径' : '' }}</span>
+            <span v-else-if="column === '完工日期'" class="sort-mark">{{ sortMode === 'finished' ? '↓对照口径' : '' }}</span>
+          </th>
           <th>当前状态</th>
-          <th>可执行动作</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
-          <td>{{ row.status }}</td>
-          <td class="row-actions">
-            <button
-              v-for="action in actions"
-              :key="action"
-              class="link"
-              type="button"
-              @click="runAction(action, row)"
-            >
-              {{ action }}
-            </button>
+        <tr v-for="row in sortedRows" :key="String(row.id)">
+          <td v-for="column in columns" :key="column">
+            <template v-if="isDateField(column)">
+              <span v-if="row[column]">{{ row[column] }}</span>
+              <span v-else class="missing">缺值·待补录</span>
+            </template>
+            <template v-else-if="column === '处置班组'">
+              <span v-if="row[column]">{{ row[column] }}</span>
+              <span v-else class="missing">缺值·待补录</span>
+            </template>
+            <template v-else>{{ row[column] ?? '—' }}</template>
           </td>
+          <td>{{ row.status }}</td>
         </tr>
-        <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无渗漏水处置数据，可先登记渗漏处置单</td>
+        <tr v-if="!sortedRows.length">
+          <td :colspan="columns.length + 1" class="empty-state">当前条件下没有渗漏处置记录</td>
         </tr>
       </tbody>
     </table>
 
     <footer class="page-foot">
-      <span>共 {{ total }} 条渗漏水处置记录</span>
+      <span>共 {{ sortedRows.length }} 条；导出同样保留缺值（空白），不填默认日期</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -73,31 +75,54 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import {
-  downloadEntries,
-  listEntries,
-  moduleMeta,
-  runAction as applyAction,
-} from '@/api/local-service'
+import { downloadEntries, listEntries, moduleMeta } from '@/api/local-service'
+import { isValidDate } from '@/domain/tunnel-domain'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('leak')
 const columns = ["处置编号", "渗漏点位", "渗漏程度", "处置方式", "处置班组", "发现日期", "完工日期", "处置状态"]
-const actions = ["派出处置", "确认完工", "要求返工"]
-const statuses = ["待处置", "处置中", "已完工", "需返工"]
-const stats = [{"label": "待处置渗漏点", "value": 0}, {"label": "处置中渗漏点", "value": 0}, {"label": "本月完工数", "value": 0}]
+const dateFields = new Set(["发现日期", "完工日期"])
 
 const rows = ref<EntryRow[]>([])
-const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
-const filterFields = columns.slice(0, 3)
-const statusSummary = computed(() =>
-  statuses.map((status: string) => ({
-    status,
-    count: rows.value.filter((row) => String(row.status) === status).length,
-  })),
-)
+const filterFields = ["处置编号", "渗漏点位"]
+const sortMode = ref<'found' | 'finished'>('found')
+
+const sortedRows = computed(() => {
+  const field = sortMode.value === 'found' ? '发现日期' : '完工日期'
+  return [...rows.value].sort((a, b) => {
+    const va = String(a[field] ?? '')
+    const vb = String(b[field] ?? '')
+    const da = isValidDate(va) ? va : ''
+    const db = isValidDate(vb) ? vb : ''
+    // 缺值沉底；同日（或都缺）按处置编号倒序，保证顺序确定。
+    if (!da && !db) {
+      return String(b['处置编号']).localeCompare(String(a['处置编号']))
+    }
+    if (!da) {
+      return 1
+    }
+    if (!db) {
+      return -1
+    }
+    if (db !== da) {
+      return db.localeCompare(da)
+    }
+    return String(b['处置编号']).localeCompare(String(a['处置编号']))
+  })
+})
+
+const stats = computed(() => [
+  { label: "待处置渗漏点", value: rows.value.filter((r) => r.status === '待处置').length },
+  { label: "处置中渗漏点", value: rows.value.filter((r) => r.status === '处置中').length },
+  { label: "缺发现日期待补", value: rows.value.filter((r) => !isValidDate(r['发现日期'])).length },
+  { label: "已完工", value: rows.value.filter((r) => r.status === '已完工').length },
+])
+
+function isDateField(field: string): boolean {
+  return dateFields.has(field)
+}
 
 function resetFilters() {
   filters.value = {}
@@ -108,28 +133,13 @@ function exportRows() {
   downloadEntries(meta.key)
 }
 
-function openCreate() {
-  errorMessage.value = '渗漏处置单登记入口尚未接入审批流'
-}
-
-function runAction(action: string, row: EntryRow) {
-  errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
-  if (!result.ok) {
-    errorMessage.value = result.message
-    return
-  }
-  reload()
-}
-
 function reload() {
   errorMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
-    total.value = payload.total
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '渗漏水处置列表读取失败'
+    errorMessage.value = error instanceof Error ? error.message : '渗漏处置列表读取失败'
   }
 }
 
